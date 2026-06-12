@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLenis } from '../hooks/useLenis';
 import { useImagePreloader } from '../hooks/useImagePreloader';
 import { useSequenceRenderer } from '../hooks/useSequenceRenderer';
 import { SequenceCanvas } from './SequenceCanvas';
+import { HUDOverlay } from './HUDOverlay';
 
 // Register ScrollTrigger client-side
 if (typeof window !== 'undefined') {
@@ -21,18 +22,51 @@ export function HeroSequence() {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Overlay text refs for ScrollTrigger synchronization
-  const introRef = useRef<HTMLDivElement>(null);
-  const layer1Ref = useRef<HTMLDivElement>(null);
-  const layer2Ref = useRef<HTMLDivElement>(null);
-  const layer3Ref = useRef<HTMLDivElement>(null);
-  const outroRef = useRef<HTMLDivElement>(null);
+  // States to drive real-time telemetry and HUD animations
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [activeSection, setActiveSection] = useState(0);
+
+  // Debugging states for looping loader and entering site
+  const [loopProgress, setLoopProgress] = useState(0);
+  const [dotCycle, setDotCycle] = useState(0);
+  const [showLoader, setShowLoader] = useState(true);
+  const [isFadingOut, setIsFadingOut] = useState(false);
 
   // 1. Initialize Lenis smooth scroll and connect to GSAP
   useLenis();
 
-  // 2. Preload & pre-decode the 89 WebP frames
+  // 2. Preload & pre-decode the 179 WebP frames
   const { frames, progress, isLoaded, error } = useImagePreloader(TOTAL_FRAMES, getFrameUrl);
+
+  // Smooth transition from loading screen to main site
+  useEffect(() => {
+    if (isLoaded) {
+      const fadeTimer = setTimeout(() => {
+        setIsFadingOut(true);
+        const removeTimer = setTimeout(() => {
+          setShowLoader(false);
+        }, 800);
+        return () => clearTimeout(removeTimer);
+      }, 500);
+      return () => clearTimeout(fadeTimer);
+    }
+  }, [isLoaded]);
+
+  // Auto-loop progress and dot loader cycle timers
+  useEffect(() => {
+    const progressInterval = setInterval(() => {
+      setLoopProgress((prev) => (prev >= 100 ? 0 : prev + 2));
+    }, 50);
+
+    const dotInterval = setInterval(() => {
+      setDotCycle((prev) => (prev + 1) % 3);
+    }, 350);
+
+    return () => {
+      clearInterval(progressInterval);
+      clearInterval(dotInterval);
+    };
+  }, []);
 
   // 3. Connect Canvas renderer to ScrollTrigger and the GSAP ticker
   useSequenceRenderer({
@@ -45,88 +79,52 @@ export function HeroSequence() {
     scrollLength: SCROLL_LENGTH,
   });
 
-  // 4. Orchestrate overlapping text animations in sync with scroll progress
+  // 4. Synchronize scroll progress state with ScrollTrigger in real-time
   useEffect(() => {
     if (!isLoaded || !containerRef.current) return;
 
-    const ctx = gsap.context(() => {
-      // Create a master timeline locked to the container's pinning scroll with smooth catch-up
-      const tl = gsap.timeline({
-        scrollTrigger: {
-          trigger: containerRef.current,
-          start: 'top top',
-          end: SCROLL_LENGTH,
-          scrub: true, // Matches the canvas sequence perfectly without added lag
-        },
-      });
+    const scrollTriggerInstance = ScrollTrigger.create({
+      trigger: containerRef.current,
+      start: 'top top',
+      end: SCROLL_LENGTH,
+      scrub: true,
+      onUpdate: (self) => {
+        setScrollProgress(self.progress);
+        // Map scroll progress to 5 discrete sections (0 to 4)
+        const section = Math.min(4, Math.floor(self.progress * 5));
+        setActiveSection(section);
+      },
+    });
 
-      // Default hidden states set by CSS but managed here
-      gsap.set([introRef.current, layer1Ref.current, layer2Ref.current, layer3Ref.current, outroRef.current], {
-        opacity: 0,
-        y: 60,
-      });
-
-      // TIMELINE ORCHESTRATION (Relative offsets sync text triggers with mask disassembly frames)
-      
-      // Step 1: Intro Text (Title fades in immediately, stays, and fades out)
-      tl.to(introRef.current, { opacity: 1, y: 0, duration: 1.5 })
-        .to(introRef.current, { opacity: 0, y: -60, duration: 1.5 }, '+=1.0')
-
-      // Step 2: Feature Layer 1: Titanium Exoskeleton
-        .to(layer1Ref.current, { opacity: 1, y: 0, duration: 1.5 }, '+=0.5')
-        .to(layer1Ref.current, { opacity: 0, y: -60, duration: 1.5 }, '+=1.2')
-
-      // Step 3: Feature Layer 2: Optic Sensors
-        .to(layer2Ref.current, { opacity: 1, y: 0, duration: 1.5 }, '+=0.5')
-        .to(layer2Ref.current, { opacity: 0, y: -60, duration: 1.5 }, '+=1.2')
-
-      // Step 4: Feature Layer 3: Neural Link Nodes
-        .to(layer3Ref.current, { opacity: 1, y: 0, duration: 1.5 }, '+=0.5')
-        .to(layer3Ref.current, { opacity: 0, y: -60, duration: 1.5 }, '+=1.2')
-
-      // Step 5: Cinematic Outro (Disassembly complete)
-        .to(outroRef.current, { opacity: 1, y: 0, duration: 1.5 }, '+=0.5')
-        .to(outroRef.current, { opacity: 0, duration: 1.5 }, '+=1.5');
-    }, containerRef);
-
-    return () => ctx.revert(); // Clean up GSAP timelines on unmount
+    return () => {
+      scrollTriggerInstance.kill();
+    };
   }, [isLoaded]);
 
-  // Premium, immersive Apple-style loading screen
-  if (!isLoaded) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-white font-sans">
-        <div className="relative flex flex-col items-center max-w-md w-full px-8">
-          {/* Subtle glowing ring background */}
-          <div className="absolute -top-12 w-36 h-36 rounded-full bg-indigo-500/10 blur-2xl animate-pulse" />
-          
-          <h2 className="text-xs uppercase tracking-[0.3em] text-zinc-400 font-semibold mb-6 text-center">
-            Initializing neural interface
-          </h2>
+  const loadingStages = [
+    'CONNECTING NEURAL SYNC...',
+    'PARSING DISASSEMBLY VECTORS...',
+    'LOADING GRADE-5 TITANIUM MESH...',
+    'INITIALIZING WEBGL SHADER BUFFERS...',
+    'NOMINAL STATE COMPILED // READY',
+  ];
+  // Map current loop progress (0-100) to stages
+  const currentStage = loadingStages[Math.min(loadingStages.length - 1, Math.floor((loopProgress / 100) * loadingStages.length))];
 
-          {/* Loader bar container */}
-          <div className="w-full h-[2px] bg-zinc-800 rounded-full overflow-hidden mb-4 relative">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 transition-all duration-300 ease-out shadow-[0_0_10px_rgba(99,102,241,0.5)]"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-
-          {/* Load values */}
-          <div className="flex w-full justify-between text-[11px] font-mono tracking-widest text-zinc-500 uppercase">
-            <span>Progress</span>
-            <span className="text-zinc-300 font-bold">{progress}%</span>
-          </div>
-
-          {error && (
-            <p className="mt-6 text-xs text-red-400 tracking-wider font-mono bg-red-950/20 border border-red-500/10 px-4 py-2 rounded-md">
-              ⚠️ {error}
-            </p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // Helper to compute dot animation classes (1st=green, 2nd=white, 3rd=gray rotating)
+  const getDotClass = (dotIndex: number) => {
+    const relativePos = (dotIndex - dotCycle + 3) % 3;
+    if (relativePos === 0) {
+      // Theme green
+      return 'bg-accent shadow-[0_0_10px_rgba(163,230,53,0.95)] opacity-100 scale-110';
+    } else if (relativePos === 1) {
+      // Lite white
+      return 'bg-white/90 opacity-90';
+    } else {
+      // Gray
+      return 'bg-zinc-600/60 opacity-50';
+    }
+  };
 
   return (
     <div ref={containerRef} className="relative w-full bg-black select-none">
@@ -138,86 +136,130 @@ export function HeroSequence() {
         </div>
 
         {/* Ambient shadow gradient overlays for optimal text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
 
-        {/* Synchronized HUD-like text layers */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-full max-w-6xl px-8 md:px-16 relative h-full flex flex-col justify-center">
+        {/* Premium Sci-Fi HUD Overlay */}
+        <HUDOverlay startEntry={isFadingOut} scrollProgress={scrollProgress} activeSection={activeSection} />
+      </div>
+
+      {/* High-fidelity HUD preloader overlay */}
+      {showLoader && (
+        <div 
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-white font-mono select-none overflow-hidden"
+          style={{
+            transition: 'opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1)',
+            opacity: isFadingOut ? 0 : 1,
+            transform: isFadingOut ? 'scale(0.96) translateY(-10px)' : 'scale(1) translateY(0)',
+            pointerEvents: isFadingOut ? 'none' : 'auto'
+          }}
+        >
+          {/* Ambient background accent light */}
+          <div className="absolute w-[500px] h-[500px] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
+
+          {/* Outer Grid Crosses Container */}
+          <div className="relative flex flex-col items-center w-full max-w-[540px] px-6">
             
-            {/* Overlay 1: Cinematic Intro Title */}
-            <div ref={introRef} className="absolute self-center text-center w-full max-w-xl px-6">
-              <h1 className="text-4xl md:text-7xl font-bold tracking-[-0.03em] leading-tight text-white mb-6 uppercase">
-                CYBERNETIC <br/>
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
-                  EXOSKELETON
-                </span>
-              </h1>
-              <p className="text-sm md:text-base tracking-[0.25em] uppercase text-zinc-400 font-medium font-sans">
-                Scroll to disassemble
-              </p>
-            </div>
-
-            {/* Overlay 2: Feature Layer 1 */}
-            <div ref={layer1Ref} className="absolute bottom-16 left-6 right-6 w-auto max-w-sm mx-auto text-center px-6 py-4 bg-black/60 backdrop-blur-sm border border-white/5 rounded-xl md:left-16 md:right-auto md:bottom-auto md:w-full md:max-w-md md:text-left md:px-0 md:py-0 md:bg-transparent md:backdrop-blur-none md:border-none md:rounded-none">
-              <span className="text-[10px] md:text-xs font-mono font-bold tracking-widest text-indigo-400 uppercase mb-2 block">
-                [ 01 / STRUCTURAL LAYER ]
+            {/* Top Center Box */}
+            <div className="absolute -top-[16px] left-1/2 -translate-x-1/2 flex flex-col items-center">
+              <span className="text-[6px] text-accent/75 tracking-[0.2em] font-bold mb-1 select-none animate-pulse">
+                ///////////////
               </span>
-              <h3 className="text-2xl md:text-5xl font-semibold text-white tracking-tight leading-none mb-4 uppercase">
-                Titanium Alloy Shell
-              </h3>
-              <p className="text-xs md:text-base text-zinc-400 leading-relaxed font-light">
-                Grade-5 forged metallic exoskeleton provides unmatched structural shielding and micro-impact absorption. Engineered for maximum weight-to-strength efficiency.
-              </p>
+              <div className="w-20 h-2 bg-zinc-950 border border-white/10 border-b-0" />
             </div>
 
-            {/* Overlay 3: Feature Layer 2 */}
-            <div ref={layer2Ref} className="absolute bottom-16 left-6 right-6 w-auto max-w-sm mx-auto text-center px-6 py-4 bg-black/60 backdrop-blur-sm border border-white/5 rounded-xl md:left-auto md:right-16 md:bottom-auto md:w-full md:max-w-md md:text-left md:px-0 md:py-0 md:bg-transparent md:backdrop-blur-none md:border-none md:rounded-none">
-              <span className="text-[10px] md:text-xs font-mono font-bold tracking-widest text-blue-400 uppercase mb-2 block">
-                [ 02 / SENSORY MATRIX ]
-              </span>
-              <h3 className="text-2xl md:text-5xl font-semibold text-white tracking-tight leading-none mb-4 uppercase">
-                Micro-OLED Cortex
-              </h3>
-              <p className="text-xs md:text-base text-zinc-400 leading-relaxed font-light">
-                Dual 8K micro-OLED ocular arrays deliver real-time environmental diagnostics, neural-feed projections, and seamless overlay of telemetry directly into your optic nerve.
-              </p>
+            {/* Main Central Card Block */}
+            <div className="w-full bg-zinc-950/80 border border-white/10 px-6 py-6 flex flex-col justify-between select-none relative z-10">
+              
+              {/* Left Bracket - enclosing the main card block */}
+              <div className="absolute -left-6 md:-left-8 -top-2 -bottom-2 w-3 border-t border-b border-l border-white/25 flex items-center justify-start pointer-events-none">
+                <div className="w-1.5 h-[1px] bg-white/25" />
+              </div>
+
+              {/* Right Bracket - enclosing the main card block */}
+              <div className="absolute -right-6 md:-right-8 -top-2 -bottom-2 w-3 border-t border-b border-r border-white/25 flex items-center justify-end pointer-events-none">
+                <div className="w-1.5 h-[1px] bg-white/25" />
+              </div>
+
+              {/* Top Section: Diagnostics telemetry paragraphs */}
+              <div className="flex justify-between items-start w-full">
+                {/* Left Paragraph: Text and Icon */}
+                <div className="flex gap-3 items-center">
+                  {/* SVG Screen/Monitor Icon with '+' */}
+                  <div className="w-9 h-9 flex items-center justify-center bg-zinc-900/50 border border-white/5 flex-shrink-0">
+                    <svg className="w-5 h-5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                      <rect x="2" y="4" width="20" height="12" rx="1" />
+                      <path d="M8 20h8M12 16v4" />
+                      <path d="M12 8v4M10 10h4" stroke="#a3e635" strokeWidth="2" />
+                    </svg>
+                  </div>
+                  {/* Subtext info */}
+                  <div className="flex flex-col text-[7px] text-zinc-500 leading-normal tracking-wider uppercase">
+                    <span>PRELOADER SEQUENCE // OS</span>
+                    <span>SYNEX Grade-5 titanium shell</span>
+                    <span>neural interface loading</span>
+                  </div>
+                </div>
+                
+                {/* Right Paragraph: Status and Rev */}
+                <div className="flex flex-col items-end text-[7px] text-zinc-500 leading-normal tracking-wider uppercase text-right">
+                  <span className="text-accent">SYS_REV_2.4</span>
+                  <span>BOOT_FLOW // OK</span>
+                  <span>CAL_INDEX: {loopProgress}%</span>
+                </div>
+              </div>
+
+              {/* Middle Section: Word SYNEX and Diamonds */}
+              <div className="flex justify-between items-center my-6">
+                {/* Main Title */}
+                <h1 className="text-3xl md:text-4xl font-sans font-black tracking-[0.2em] text-white uppercase leading-none">
+                  SYNEX
+                </h1>
+                
+                {/* Diamond and loading stripe cluster */}
+                <div className="flex items-center gap-4">
+                  {/* Custom Danger/Loading stripes */}
+                  <div className="w-6 h-2 bg-[repeating-linear-gradient(45deg,rgba(163,230,53,0.6)_0px,rgba(163,230,53,0.6)_2px,transparent_2px,transparent_4px)]" />
+
+                  {/* Triple Dot Loader */}
+                  <div className="flex items-center gap-2 h-6 flex-shrink-0">
+                    {/* 1st dot (theme green in state 0) */}
+                    <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${getDotClass(0)}`} />
+                    {/* 2nd dot (lite white in state 0) */}
+                    <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${getDotClass(1)}`} />
+                    {/* 3rd dot (gray in state 0) */}
+                    <div className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${getDotClass(2)}`} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Solid Divider Line acting as a loading progress bar */}
+              <div className="w-full h-[2px] bg-white/10 mb-3 relative overflow-hidden">
+                <div 
+                  className="h-full bg-white transition-all duration-150 ease-out"
+                  style={{ width: `${loopProgress}%` }}
+                />
+              </div>
+
+              {/* Lower Section: Project context details */}
+              <div className="flex flex-col text-left">
+                {/* Context text (changing stage + progress info) */}
+                <div className="text-[10px] md:text-[11px] font-mono tracking-[0.15em] text-zinc-200 uppercase">
+                  {loopProgress}% EXOSKELETON DISASSEMBLY LOADED
+                </div>
+                <div className="text-[8px] font-mono tracking-[0.1em] text-zinc-500 uppercase mt-1">
+                  STAGE // {currentStage}
+                </div>
+              </div>
             </div>
 
-            {/* Overlay 4: Feature Layer 3 */}
-            <div ref={layer3Ref} className="absolute bottom-16 left-6 right-6 w-auto max-w-sm mx-auto text-center px-6 py-4 bg-black/60 backdrop-blur-sm border border-white/5 rounded-xl md:left-16 md:right-auto md:bottom-auto md:w-full md:max-w-md md:text-left md:px-0 md:py-0 md:bg-transparent md:backdrop-blur-none md:border-none md:rounded-none">
-              <span className="text-[10px] md:text-xs font-mono font-bold tracking-widest text-purple-400 uppercase mb-2 block">
-                [ 03 / BIO-LINK SYSTEM ]
-              </span>
-              <h3 className="text-2xl md:text-5xl font-semibold text-white tracking-tight leading-none mb-4 uppercase">
-                Synaptic Interface
-              </h3>
-              <p className="text-xs md:text-base text-zinc-400 leading-relaxed font-light">
-                Integrated neuro-link receivers directly interface with the cerebral cortex, translating motor commands into low-latency cybernetic telemetry.
+            {error && (
+              <p className="mt-8 text-[9px] text-red-400 tracking-widest font-mono bg-red-950/20 border border-red-500/10 px-4 py-2 rounded-none">
+                WARNING // {error}
               </p>
-            </div>
-
-            {/* Overlay 5: Outro Layer */}
-            <div ref={outroRef} className="absolute self-center text-center w-full max-w-2xl px-6">
-              <h2 className="text-4xl md:text-7xl font-extrabold tracking-[-0.03em] leading-tight text-white mb-6 uppercase">
-                SYSTEM FULLY <br />
-                <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-400">
-                  DISASSEMBLED
-                </span>
-              </h2>
-              <p className="text-sm md:text-base tracking-[0.2em] uppercase text-zinc-400 font-medium">
-                Prototype v1.0. All components responsive.
-              </p>
-            </div>
-
+            )}
           </div>
         </div>
-
-        {/* HUD Indicator in Corner */}
-        <div className="absolute top-6 left-6 md:top-auto md:bottom-6 md:left-16 pointer-events-none flex items-center gap-4 text-zinc-500 font-mono text-[10px] tracking-[0.2em] uppercase">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span>SYNEX // DISASSEMBLY MODE</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

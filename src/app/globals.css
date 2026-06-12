@@ -1,33 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-sans: var(--font-outfit), sans-serif;
+  --font-mono: var(--font-space-mono), monospace;
+  --color-accent: #a3e635; /* Neon lime-green accent */
+  --color-hud-gray: rgba(255, 255, 255, 0.04);
+  --color-hud-lines: rgba(255, 255, 255, 0.05);
 }
 
 html, body {
   max-width: 100%;
   overflow-x: hidden;
+  background-color: #000000;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #000000;
+  color: #ffffff;
+  font-family: var(--font-outfit), sans-serif;
 }
 
 /* Lenis Smooth Scroll Recommended Styles */
@@ -49,4 +44,58 @@ html.lenis, html.lenis-pure {
 
 .lenis.lenis-scrolling iframe {
   pointer-events: none;
+}
+
+/* --- FUTURE TECH HUD INTERFACE STYLES --- */
+
+/* Scanning Telemetry Line */
+@keyframes scanline {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+.hud-scanline {
+  animation: scanline 8s linear infinite;
+}
+
+/* HUD Target Blinking */
+@keyframes hud-blink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.95; }
+}
+
+.hud-blink-active {
+  animation: hud-blink 1.5s ease-in-out infinite;
+}
+
+/* Subtle diagnostic data scroll animation */
+@keyframes data-crawl {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.hud-data-crawl {
+  animation: data-crawl 20s linear infinite;
+}
+
+/* Custom glow classes */
+.glow-accent {
+  text-shadow: 0 0 10px rgba(163, 230, 53, 0.3);
+}
+
+.glow-border {
+  box-shadow: 0 0 15px rgba(163, 230, 53, 0.1);
+}
+
+/* Hide scrollbar completely but retain scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
