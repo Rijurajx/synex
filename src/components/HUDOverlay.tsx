@@ -2,6 +2,67 @@
 
 import { useState, useEffect } from 'react';
 
+interface ScrambledTextProps {
+  text: string;
+  active: boolean;
+  delay?: number;
+  duration?: number;
+}
+
+function ScrambledText({ text, active, delay = 0, duration = 600 }: ScrambledTextProps) {
+  const [displayText, setDisplayText] = useState('');
+  const chars = 'XYZ//0123456789_+=?*&%$#@![]{}<>/\\';
+
+  useEffect(() => {
+    if (!active) {
+      setDisplayText('');
+      return;
+    }
+
+    const startTimeout = setTimeout(() => {
+      let startTime = Date.now();
+      let timer: number;
+
+      const tick = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / duration);
+
+        const nextText = text
+          .split('')
+          .map((char, idx) => {
+            if (char === ' ') return char;
+            const isResolved = progress > (idx / text.length) * 0.8;
+            if (isResolved) return char;
+            return chars[Math.floor(Math.random() * chars.length)];
+          })
+          .join('');
+
+        setDisplayText(nextText);
+
+        if (progress < 1) {
+          timer = requestAnimationFrame(tick);
+        } else {
+          setDisplayText(text);
+        }
+      };
+
+      timer = requestAnimationFrame(tick);
+
+      return () => {
+        cancelAnimationFrame(timer);
+      };
+    }, delay);
+
+    return () => clearTimeout(startTimeout);
+  }, [text, active, delay, duration]);
+
+  if (!active) {
+    return <span className="opacity-0">{text}</span>;
+  }
+
+  return <span>{displayText}</span>;
+}
+
 interface HUDOverlayProps {
   startEntry: boolean;
   scrollProgress: number;
@@ -270,18 +331,64 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
         >
           <div className="flex items-center gap-1.5 font-bold text-accent mb-1.5">
             <span className="w-1.5 h-1.5 bg-accent animate-pulse rounded-full" />
-            <span>SYS // SYNEX_OVERVIEW</span>
+            <span>
+              <ScrambledText text="SYS // SYNEX_OVERVIEW" active={boxStage === 3} delay={0} />
+            </span>
           </div>
           <div className="space-y-0.5 text-zinc-100">
-            <div><span className="text-zinc-400 font-bold">[MODEL]</span> &nbsp;&nbsp;<span className="text-white">SYNEX_V1.00</span></div>
-            <div><span className="text-zinc-400 font-bold">[TYPE]</span> &nbsp;&nbsp;<span className="text-white">ORNAMENTAL_EXO</span></div>
-            <div><span className="text-zinc-400 font-bold">[PURPOSE]</span> <span className="text-white">SHOWCASING_UI_UX</span></div>
-            <div><span className="text-zinc-400 font-bold">[CREATOR]</span> <span className="text-white">RIJURAJ [DEV]</span></div>
-            <div><span className="text-zinc-400 font-bold">[CLASS]</span> &nbsp;&nbsp;<span className="text-white">HOBBY_BUILD</span></div>
+            <div>
+              <span className="text-zinc-400 font-bold">
+                <ScrambledText text="[MODEL]" active={boxStage === 3} delay={150} />
+              </span>
+              &nbsp;&nbsp;
+              <span className="text-white">
+                <ScrambledText text="SYNEX_V1.00" active={boxStage === 3} delay={250} />
+              </span>
+            </div>
+            <div>
+              <span className="text-zinc-400 font-bold">
+                <ScrambledText text="[TYPE]" active={boxStage === 3} delay={200} />
+              </span>
+              &nbsp;&nbsp;
+              <span className="text-white">
+                <ScrambledText text="ORNAMENTAL_EXO" active={boxStage === 3} delay={300} />
+              </span>
+            </div>
+            <div>
+              <span className="text-zinc-400 font-bold">
+                <ScrambledText text="[PURPOSE]" active={boxStage === 3} delay={250} />
+              </span>
+              &nbsp;
+              <span className="text-white">
+                <ScrambledText text="SHOWCASING_UI_UX" active={boxStage === 3} delay={350} />
+              </span>
+            </div>
+            <div>
+              <span className="text-zinc-400 font-bold">
+                <ScrambledText text="[CREATOR]" active={boxStage === 3} delay={300} />
+              </span>
+              &nbsp;
+              <span className="text-white">
+                <ScrambledText text="RIJURAJ [DEV]" active={boxStage === 3} delay={400} />
+              </span>
+            </div>
+            <div>
+              <span className="text-zinc-400 font-bold">
+                <ScrambledText text="[CLASS]" active={boxStage === 3} delay={350} />
+              </span>
+              &nbsp;&nbsp;
+              <span className="text-white">
+                <ScrambledText text="HOBBY_BUILD" active={boxStage === 3} delay={450} />
+              </span>
+            </div>
           </div>
           <div className="mt-2.5 text-[8px] text-zinc-600 border-t border-white/5 pt-1.5 flex justify-between gap-4">
-            <span className="text-accent/60">STATUS: NOMINAL</span>
-            <span className="text-zinc-500">© 2026</span>
+            <span className="text-accent/60">
+              <ScrambledText text="STATUS: NOMINAL" active={boxStage === 3} delay={500} />
+            </span>
+            <span className="text-zinc-500">
+              <ScrambledText text="© 2026" active={boxStage === 3} delay={550} />
+            </span>
           </div>
         </div>
       </div>
