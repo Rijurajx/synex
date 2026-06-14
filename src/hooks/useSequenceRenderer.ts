@@ -75,10 +75,8 @@ interface RendererOptions {
     };
     window.addEventListener('resize', handleResize, { passive: true });
 
-    // 2. Setup GSAP ScrollTrigger to smoothly scrub targetFrame with fast catch-up
-    const animation = gsap.to(state, {
-      targetFrame: totalFrames - 1,
-      ease: 'none',
+    // 2. Setup GSAP ScrollTrigger timeline to smoothly scrub targetFrame with a 15% static buffer at the end
+    const tl = gsap.timeline({
       scrollTrigger: {
         trigger: container,
         start: 'top top',
@@ -87,6 +85,15 @@ interface RendererOptions {
         scrub: true, // Bind directly to smooth scroll
       },
     });
+
+    tl.to(state, {
+      targetFrame: totalFrames - 1,
+      ease: 'none',
+      duration: 8.5,
+    });
+    tl.addLabel("bufferEnd", 10);
+
+    const animation = tl;
 
     // Track if rendering is currently frozen during low-velocity scroll tail
     let isFrozen = false;

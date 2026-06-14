@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Outfit, Space_Mono } from "next/font/google";
+import { Outfit, Space_Mono, Oxanium } from "next/font/google";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -10,6 +10,12 @@ const outfit = Outfit({
 const spaceMono = Space_Mono({
   variable: "--font-space-mono",
   weight: ["400", "700"],
+  subsets: ["latin"],
+});
+
+const oxanium = Oxanium({
+  variable: "--font-oxanium",
+  weight: ["400", "600", "800"],
   subsets: ["latin"],
 });
 
@@ -26,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${outfit.variable} ${spaceMono.variable} antialiased`}
+      className={`${outfit.variable} ${spaceMono.variable} ${oxanium.variable} antialiased`}
     >
       <body className="flex flex-col bg-black">{children}</body>
     </html>

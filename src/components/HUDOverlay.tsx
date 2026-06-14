@@ -77,6 +77,72 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
   const [animProgress, setAnimProgress] = useState(0);
   const [boxStage, setBoxStage] = useState(0);
 
+  const [telemetry, setTelemetry] = useState({
+    sync: 98.42,
+    temp: 34.8,
+    delay: 0.08,
+    reg: '0x7FFF9821'
+  });
+
+  const [topRightStage, setTopRightStage] = useState(0);
+  const [resolution, setResolution] = useState({ w: 1920, h: 1080 });
+
+  // Trigger top-right telemetry panel entry stage animations
+  useEffect(() => {
+    if (!startEntry) {
+      setTopRightStage(0);
+      return;
+    }
+
+    const t1 = setTimeout(() => setTopRightStage(1), 300); // Stage 1: Draw horizontal lines
+    const t2 = setTimeout(() => setTopRightStage(2), 700); // Stage 2: Draw vertical scales & background
+    const t3 = setTimeout(() => setTopRightStage(3), 1200); // Stage 3: Activate telemetry contents
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [startEntry]);
+
+  // Track window resolution for layout and live metrics calculations
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => {
+      setResolution({ w: window.innerWidth, h: window.innerHeight });
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Real-time calculations derived from actual scroll progress
+  const frameIndex = activeSection === 0 
+    ? Math.min(179, Math.max(0, Math.round(Math.min(1, scrollProgress / 0.85) * 179))) 
+    : 0;
+
+  const scrollPixelY = activeSection === 0 
+    ? Math.round(scrollProgress * 4 * resolution.h)
+    : Math.round((activeSection + 3) * resolution.h);
+
+  const fadeOutProgress = activeSection <= 1 ? 1 : 0;
+
+  // Cycle telemetry data jitters periodically
+  useEffect(() => {
+    if (!startEntry) return;
+
+    const interval = setInterval(() => {
+      setTelemetry({
+        sync: Number((98.2 + Math.random() * 0.4).toFixed(2)),
+        temp: Number((34.5 + Math.random() * 0.6).toFixed(1)),
+        delay: Number((0.07 + Math.random() * 0.03).toFixed(2)),
+        reg: `0x7FFF9${Math.floor(1000 + Math.random() * 8999).toString(16).toUpperCase()}`
+      });
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [startEntry]);
+
   // Stagger letters fade-in slide-down
   useEffect(() => {
     if (!startEntry) {
@@ -147,14 +213,21 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
     };
   }, [startEntry]);
 
-  // Calculate which section is active based on scroll progress (0.0 to 1.0 mapped to 4 sections)
-  const activeIndex = Math.min(3, Math.floor(scrollProgress * 4));
+  // Use parent controlled activeSection as source of truth for active index
+  const activeIndex = activeSection;
 
   // Handler to scroll smoothly to the targeted section progress position
   const handleNavClick = (idx: number) => {
     if (typeof window === 'undefined') return;
-    const progress = idx / 3; // map 0-3 index to 0.0-1.0 progress
-    const targetScroll = progress * 4 * window.innerHeight; // 400vh is the sequence length
+    let targetScroll = 0;
+    if (idx === 0) {
+      targetScroll = 0;
+    } else {
+      // Index 1 (PROTOTYPES) starts at 400vh
+      // Index 2 (SERVICES) starts at 500vh
+      // Index 3 (CONTACT) starts at 600vh
+      targetScroll = (idx + 3) * window.innerHeight;
+    }
     window.scrollTo({
       top: targetScroll,
       behavior: 'smooth',
@@ -162,10 +235,110 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
   };
 
   return (
-    <div className="absolute inset-0 w-full h-screen pointer-events-none z-20 select-none">
+    <>
+      {/* Top Right Live Telemetry Module - Distinct Wireframe / Grid Layout */}
+      <div 
+        className="fixed top-8 right-8 md:top-12 md:right-12 lg:top-16 lg:right-16 z-30 select-none border-l border-white/10 hud-dot-grid overflow-hidden transition-all duration-700 ease-out"
+        style={{
+          opacity: fadeOutProgress,
+          pointerEvents: (fadeOutProgress > 0.1 && topRightStage === 3) ? 'auto' : 'none',
+          width: topRightStage === 0 ? '0px' : topRightStage === 1 ? '100px' : '250px',
+          height: topRightStage < 2 ? '2px' : '176px',
+          backgroundColor: 'rgba(0, 0, 0, 0.35)',
+          transition: 'width 0.6s cubic-bezier(0.16, 1, 0.3, 1), height 0.6s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1)',
+          zIndex: 5,
+        }}
+      >
+        {/* Animated Scanning Pointer Slider at the top edge */}
+        <div className="absolute top-0 left-0 w-full h-[1px] bg-white/10">
+          <div className="absolute top-0 h-[1.5px] w-6 bg-accent hud-scan-horizontal shadow-[0_0_6px_#a3e635]" />
+        </div>
+
+        {/* Outer Crosshair Ticks for UI bounds */}
+        <div className="absolute top-1 left-1.5 font-mono text-[7px] text-accent/60 select-none">+</div>
+        <div className="absolute top-1 right-1.5 font-mono text-[7px] text-accent/60 select-none">+</div>
+        <div className="absolute bottom-1 left-1.5 font-mono text-[7px] text-accent/60 select-none">+</div>
+        <div className="absolute bottom-1 right-1.5 font-mono text-[7px] text-accent/60 select-none">+</div>
+
+        {/* Content Container (fades in only when Stage 3 is reached) */}
+        <div 
+          className="w-full h-full p-4 flex flex-col justify-between font-mono transition-opacity duration-500"
+          style={{
+            opacity: topRightStage === 3 ? 1 : 0,
+          }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/5 pb-1">
+            <div className="flex items-center gap-1.5 text-[9px] tracking-wider text-accent font-bold">
+              <span className="w-1 h-1 bg-accent rounded-full animate-ping" />
+              <span>SYS // COORD_TLM</span>
+            </div>
+            <span className="text-[7px] text-zinc-500 tracking-wider">
+              AUTO_SYNC: ON
+            </span>
+          </div>
+
+          {/* Real-Time Exoskeleton Metrics Grid */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[8px] md:text-[9px] text-zinc-400 py-1.5">
+            <div className="flex flex-col gap-0.5 border-l-2 border-accent/20 pl-1.5">
+              <span className="text-[7px] text-zinc-500 uppercase tracking-widest">[FRAME_IDX]</span>
+              <span className="text-zinc-200 font-bold tracking-wider">
+                {String(frameIndex).padStart(3, '0')} <span className="text-zinc-500 font-normal">/ 179</span>
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-0.5 border-l-2 border-accent/20 pl-1.5">
+              <span className="text-[7px] text-zinc-500 uppercase tracking-widest">[SYS_DEPTH]</span>
+              <span className="text-zinc-200 font-bold tracking-wider">{scrollPixelY} PX</span>
+            </div>
+
+            <div className="flex flex-col gap-0.5 border-l-2 border-accent/20 pl-1.5">
+              <span className="text-[7px] text-zinc-500 uppercase tracking-widest">[VIEW_RES]</span>
+              <span className="text-zinc-200 font-bold tracking-wider">{resolution.w} x {resolution.h}</span>
+            </div>
+
+            <div className="flex flex-col gap-0.5 border-l-2 border-accent/20 pl-1.5">
+              <span className="text-[7px] text-zinc-500 uppercase tracking-widest">[NEURAL_LNK]</span>
+              <span className="text-accent font-bold tracking-wider">{telemetry.sync}%</span>
+            </div>
+          </div>
+
+          {/* Core Frequency Status & Animated spectrum wave bars */}
+          <div className="flex justify-between items-center gap-4 bg-zinc-950/60 border border-white/5 p-2 rounded-none">
+            <div className="flex flex-col leading-tight">
+              <span className="text-[6px] text-zinc-500 uppercase">[SYS_CLK]</span>
+              <span className="text-[9px] text-zinc-300 font-bold tracking-wide">120.00 Hz</span>
+            </div>
+            
+            {/* Animated wave spectrum */}
+            <div className="flex items-end gap-[3px] h-4.5 w-16 justify-end select-none">
+              <span className="w-[2px] bg-accent/30 rounded-none hud-telemetry-bar-1" />
+              <span className="w-[2px] bg-accent/80 rounded-none hud-telemetry-bar-2" />
+              <span className="w-[2px] bg-accent/50 rounded-none hud-telemetry-bar-3" />
+              <span className="w-[2px] bg-accent rounded-none hud-telemetry-bar-4" />
+              <span className="w-[2px] bg-accent/40 rounded-none hud-telemetry-bar-5" />
+              <span className="w-[2px] bg-accent/95 rounded-none hud-telemetry-bar-6" />
+            </div>
+          </div>
+
+          {/* Lower console logs line */}
+          <div className="text-[7px] text-zinc-500 uppercase tracking-wide leading-none select-none flex justify-between">
+            <span>&gt; RECV_FREQ: 2.45GHZ</span>
+            <span className="text-zinc-600 font-bold">STATE: SECURE</span>
+          </div>
+        </div>
+      </div>
+
       {/* The Vertical Title "SYNEX" with premium stagger fade-in entry animation */}
-      <div className="absolute top-1/2 -translate-y-1/2 left-16 md:left-28 lg:left-40">
-        <div className="relative flex flex-col gap-0.5 md:gap-1 font-sans font-black text-[12vh] md:text-[15vh] lg:text-[19vh] leading-[0.82] tracking-tighter uppercase text-zinc-200 select-none">
+      <div 
+        className="fixed top-1/2 -translate-y-1/2 left-16 md:left-28 lg:left-40 transition-opacity duration-700 ease-out"
+        style={{
+          opacity: fadeOutProgress,
+          pointerEvents: fadeOutProgress > 0.1 ? 'auto' : 'none',
+          zIndex: 5,
+        }}
+      >
+        <div className="relative flex flex-col gap-0.5 md:gap-1 font-oxanium font-black text-[12vh] md:text-[15vh] lg:text-[19vh] leading-[0.82] tracking-tighter uppercase text-zinc-200 select-none">
           {targetWord.map((char, idx) => (
             <span 
               key={idx}
@@ -183,7 +356,7 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
       </div>
 
       {/* Connected Dots Navigation on the Right Side */}
-      <div className="absolute right-8 md:right-12 lg:right-16 top-1/2 -translate-y-1/2 flex flex-col items-end relative py-4 z-30 pointer-events-auto">
+      <div className="fixed right-8 md:right-12 lg:right-16 top-1/2 -translate-y-1/2 flex flex-col items-end py-4 z-30 pointer-events-auto">
         
         {sections.map((label, idx) => {
           const isActive = activeIndex === idx;
@@ -265,6 +438,27 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
                     />
                   </div>
                 )}
+
+                {/* Vertical connector green overlay to the next dot (scroll-driven green trunk) */}
+                {idx < sections.length - 1 && (
+                  <div 
+                    className="absolute left-1/2 -translate-x-1/2 w-[1px] h-[32px] pointer-events-none z-0 bg-transparent"
+                    style={{ top: '8px' }}
+                  >
+                    <div 
+                      className="w-full bg-accent origin-top transition-[height] duration-75 ease-out"
+                      style={{
+                        height: `${
+                          activeIndex > idx 
+                            ? 100 
+                            : activeIndex === idx 
+                              ? scrollProgress * 100 
+                              : 0
+                        }%`,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -273,13 +467,14 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
 
       {/* Glassmorphic Container with Sharp Edges & 6-sided SIM-card Cut - Bottom Right */}
       <div 
-        className={`absolute bottom-8 right-8 md:bottom-12 md:right-12 lg:bottom-16 lg:right-16 pointer-events-auto z-30 select-none rounded-none shadow-2xl group flex items-stretch gap-4 ${
+        className={`fixed bottom-8 right-8 md:bottom-12 md:right-12 lg:bottom-16 lg:right-16 select-none rounded-none shadow-2xl group flex items-stretch gap-4 ${
           boxStage < 2
             ? 'w-4 h-4'
             : 'w-[320px] md:w-[384px] h-[148px] md:h-[168px]'
         }`}
         style={{
-          opacity: boxStage === 0 ? 0 : 1,
+          opacity: boxStage === 0 ? 0 : fadeOutProgress,
+          pointerEvents: (boxStage === 3 && fadeOutProgress > 0.1) ? 'auto' : 'none',
           overflow: boxStage < 3 ? 'hidden' : 'visible',
           backgroundColor: boxStage < 2 ? 'rgba(255, 255, 255, 0)' : 'rgba(255, 255, 255, 0.1)',
           border: boxStage < 2 ? '1px solid rgba(255, 255, 255, 0)' : '1px solid rgba(255, 255, 255, 0.1)',
@@ -288,6 +483,7 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
             ? 'polygon(0px 0, 100% 0, 100% 100%, 100% 100%, 0 100%, 0 0)'
             : 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)',
           transition: 'width 0.8s cubic-bezier(0.16, 1, 0.3, 1), height 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), clip-path 0.8s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.8s ease, border-color 0.8s ease',
+          zIndex: 5,
         }}
       >
         {/* Inner solid background backplate */}
@@ -392,7 +588,7 @@ export function HUDOverlay({ startEntry, scrollProgress, activeSection }: HUDOve
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 

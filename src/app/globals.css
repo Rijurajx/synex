@@ -8,6 +8,7 @@
 @theme inline {
   --font-sans: var(--font-outfit), sans-serif;
   --font-mono: var(--font-space-mono), monospace;
+  --font-oxanium: var(--font-oxanium), sans-serif;
   --color-accent: #a3e635; /* Neon lime-green accent */
   --color-hud-gray: rgba(255, 255, 255, 0.04);
   --color-hud-lines: rgba(255, 255, 255, 0.05);
@@ -17,6 +18,13 @@ html, body {
   max-width: 100%;
   overflow-x: hidden;
   background-color: #000000;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
 }
 
 body {
@@ -80,6 +88,36 @@ html.lenis, html.lenis-pure {
 
 .hud-data-crawl {
   animation: data-crawl 20s linear infinite;
+}
+
+/* Telemetry Wave Spectrum Animation */
+@keyframes telemetry-bar {
+  0%, 100% { height: 15%; }
+  50% { height: 100%; }
+}
+
+.hud-telemetry-bar-1 { animation: telemetry-bar 1.1s ease-in-out infinite; }
+.hud-telemetry-bar-2 { animation: telemetry-bar 0.7s ease-in-out infinite 0.15s; }
+.hud-telemetry-bar-3 { animation: telemetry-bar 1.3s ease-in-out infinite 0.3s; }
+.hud-telemetry-bar-4 { animation: telemetry-bar 0.9s ease-in-out infinite 0.1s; }
+.hud-telemetry-bar-5 { animation: telemetry-bar 1.5s ease-in-out infinite 0.4s; }
+.hud-telemetry-bar-6 { animation: telemetry-bar 0.8s ease-in-out infinite 0.2s; }
+
+/* Horizontal scanning slider pointer */
+@keyframes scan-horizontal {
+  0% { left: 0%; }
+  50% { left: 100%; transform: translateX(-100%); }
+  100% { left: 0%; }
+}
+
+.hud-scan-horizontal {
+  animation: scan-horizontal 3s ease-in-out infinite;
+}
+
+/* Dotted grid panel backplate */
+.hud-dot-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 8px 8px;
 }
 
 /* Custom glow classes */
